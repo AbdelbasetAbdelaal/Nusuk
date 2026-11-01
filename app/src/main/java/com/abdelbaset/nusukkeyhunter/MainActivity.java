@@ -3,10 +3,12 @@ package com.abdelbaset.nusukkeyhunter;
 import android.app.*;
 import android.os.Bundle;
 import android.content.*;
+import android.net.Uri;
 import android.graphics.Typeface;
 import android.view.*;
 import android.widget.*;
 import java.util.*;
+import java.util.regex.*;
 
 public class MainActivity extends Activity {
     EditText codeInput;
@@ -14,74 +16,229 @@ public class MainActivity extends Activity {
     ArrayList<String> codes = new ArrayList<>();
     LinkedHashSet<String> unique = new LinkedHashSet<>();
     int accepted=0, rejected=0, pending=0;
+    String currentCode = "";
     LinearLayout root;
-    final String PREF="nusuk_keys", DATA="codes", ACCEPT="accepted", REJECT="rejected";
+    final String DATA="codes", ACCEPT="accepted", REJECT="rejected";
+    final Pattern invitePattern = Pattern.compile("(?i)\\bNG-[A-Z0-9_-]{5,}\\b");
+
+    final String[] sourceLinks = {
+        "https://www.facebook.com/share/g/1FaRSgvxMT/",
+        "https://www.facebook.com/share/g/19emnymdLB/",
+        "https://www.facebook.com/share/1DEPUwaNLk/",
+        "https://www.facebook.com/share/1DoMzCRQqN/"
+    };
 
     public void onCreate(Bundle b) {
         super.onCreate(b);
         getWindow().setStatusBarColor(0xFF123D35);
         getWindow().setNavigationBarColor(0xFF123D35);
-        load(); render();
+        load();
+        render();
+        handleSharedIntent(getIntent());
     }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleSharedIntent(intent);
+    }
+
     TextView text(String s,int size) {
-        TextView t=new TextView(this); t.setText(s); t.setTextSize(size); t.setTextColor(0xFF18352F); t.setPadding(0,8,0,8); return t;
+        TextView t=new TextView(this);
+        t.setText(s); t.setTextSize(size); t.setTextColor(0xFF18352F);
+        t.setPadding(0,8,0,8);
+        return t;
     }
+
     Button button(String s) {
         Button b=new Button(this); b.setText(s); return b;
     }
+
     void render() {
         ScrollView sc=new ScrollView(this);
-        root=new LinearLayout(this); root.setOrientation(1); root.setPadding(24,24,24,24); root.setBackgroundColor(0xFFF4F7F5);
-        sc.addView(root); setContentView(sc);
-        TextView title=text("Nusuk Key Hunter",26); title.setTypeface(null,Typeface.BOLD); title.setTextColor(0xFF123D35); root.addView(title);
-        root.addView(text("منظّم أكواد الدعوة — حفظ، إزالة التكرار، ومتابعة النتائج",14));
+        root=new LinearLayout(this);
+        root.setOrientation(1);
+        root.setPadding(24,24,24,24);
+        root.setBackgroundColor(0xFFF4F7F5);
+        sc.addView(root);
+        setContentView(sc);
+
+        TextView title=text("Nusuk Key Hunter",26);
+        title.setTypeface(null,Typeface.BOLD);
+        title.setTextColor(0xFF123D35);
+        root.addView(title);
+        root.addView(text("منظّم أكواد الدعوة — بحث مساعد في فيسبوك واستخراج الأكواد من المنشورات المشتركة",14));
+
         countText=text("",16); root.addView(countText); updateCounts();
-        root.addView(text("أضف كودًا أو الصق مجموعة أكواد",18));
-        codeInput=new EditText(this); codeInput.setHint("الصق الأكواد هنا، كل كود في سطر"); codeInput.setMinLines(3); codeInput.setGravity(Gravity.TOP); root.addView(codeInput);
-        Button add=button("إضافة الأكواد وإزالة المكرر"); root.addView(add);
+
+        root.addView(text("البحث عن الأكواد في فيسبوك",20));
+        Button search=button("فتح بحث فيسبوك عن أكواد نسك");
+        root.addView(search);
+        search.setOnClickListener(v -> openUrl("https://www.facebook.com/search/posts/?q=كود%20نسك"));
+
+        root.addView(text("المجموعات والمنشورات التي أرسلت روابطها",16));
+        String[] labels={"فتح مجموعة فيسبوك الأولى","فتح مجموعة فيسبوك الثانية","فتح منشور فيسبوك الثالث","فتح منشور فيسبوك الرابع"};
+        for(int i=0;i<sourceLinks.length;i++) {
+            final String link=sourceLinks[i];
+            Button b=button(labels[i]);
+            root.addView(b);
+            b.setOnClickListener(v -> openUrl(link));
+        }
+
+        root.addView(text("طريقة جمع الأكواد",16));
+        root.addView(text("افتح المجموعة وابحث داخلها عن: كود نسك أو رمز دعوة نسك. عند ظهور منشور يحتوي على كود، اضغط مشاركة ثم اختر Nusuk Key Hunter. سيستخرج التطبيق أكواد NG تلقائيًا ويحذف المكرر.",14));
+
+        root.addView(text("أضف الأكواد يدويًا أو الصقها",18));
+        codeInput=new EditText(this);
+        codeInput.setHint("الصق كودًا أو نص منشور يحتوي على كود NG-");
+        codeInput.setMinLines(3);
+        codeInput.setGravity(Gravity.TOP);
+        root.addView(codeInput);
+
+        Button add=button("استخراج الأكواد وإزالة المكرر");
+        root.addView(add);
         add.setOnClickListener(v->{ addCodes(codeInput.getText().toString()); codeInput.setText(""); });
-        Button next=button("نسخ الكود التالي"); root.addView(next);
+
+        Button next=button("نسخ الكود التالي");
+        root.addView(next);
         next.setOnClickListener(v->copyNext());
-        Button open=button("فتح موقع نسك"); root.addView(open);
-        open.setOnClickListener(v->{ try { startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse("https://services.nusuk.sa/"))); } catch(Exception e){} });
+
+        Button openNusuk=button("فتح موقع نسك");
+        root.addView(openNusuk);
+        openNusuk.setOnClickListener(v->openUrl("https://services.nusuk.sa/"));
+
         root.addView(text("سجّل نتيجة الكود المحدد",18));
         LinearLayout row=new LinearLayout(this); root.addView(row);
         Button ok=button("تم قبوله"); row.addView(ok,new LinearLayout.LayoutParams(0,-2,1));
         Button bad=button("مرفوض / مستخدم"); row.addView(bad,new LinearLayout.LayoutParams(0,-2,1));
-        ok.setOnClickListener(v->mark(true)); bad.setOnClickListener(v->mark(false));
+        ok.setOnClickListener(v->mark(true));
+        bad.setOnClickListener(v->mark(false));
+
         Button export=button("نسخ جميع الأكواد"); root.addView(export);
-        export.setOnClickListener(v->{ StringBuilder s=new StringBuilder(); for(String c:codes)s.append(c).append("\n"); copy(s.toString()); });
+        export.setOnClickListener(v->{
+            StringBuilder s=new StringBuilder();
+            for(String c:codes) s.append(c).append("\\n");
+            copy(s.toString());
+            Toast.makeText(this,"تم نسخ قائمة الأكواد",Toast.LENGTH_SHORT).show();
+        });
+
         Button clear=button("مسح جميع البيانات"); root.addView(clear);
-        clear.setOnClickListener(v->new AlertDialog.Builder(this).setMessage("هل تريد مسح الأكواد والنتائج؟").setNegativeButton("إلغاء",null).setPositiveButton("مسح",(d,w)->{codes.clear();unique.clear();accepted=0;rejected=0;pending=0;save();render();}).show());
+        clear.setOnClickListener(v->new AlertDialog.Builder(this)
+            .setMessage("هل تريد مسح الأكواد والنتائج؟")
+            .setNegativeButton("إلغاء",null)
+            .setPositiveButton("مسح",(d,w)->{
+                codes.clear(); unique.clear(); accepted=0; rejected=0; pending=0; currentCode="";
+                getPreferences(0).edit().clear().apply();
+                save(); render();
+            }).show());
+
         listText=text("",14); root.addView(listText); updateCounts();
     }
-    void addCodes(String raw) {
-        String[] parts=raw.split("[\\s,;]+"); int added=0;
-        for(String p:parts){ String c=p.trim(); if(c.length()>=5 && unique.add(c)){codes.add(c);pending++;added++;} }
-        save(); updateCounts(); Toast.makeText(this,"تمت إضافة "+added+" كود جديد",Toast.LENGTH_LONG).show();
+
+    void openUrl(String url) {
+        try {
+            Intent i=new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            startActivity(i);
+        } catch(Exception e) {
+            Toast.makeText(this,"تعذر فتح الرابط. تأكد من وجود متصفح أو تطبيق فيسبوك.",Toast.LENGTH_LONG).show();
+        }
     }
+
+    void handleSharedIntent(Intent intent) {
+        if(intent==null || !Intent.ACTION_SEND.equals(intent.getAction())) return;
+        String shared=intent.getStringExtra(Intent.EXTRA_TEXT);
+        if(shared==null) shared="";
+        LinkedHashSet<String> found=extractInviteCodes(shared);
+        if(!found.isEmpty()) {
+            addFoundCodes(found);
+            Toast.makeText(this,"استخرج التطبيق "+found.size()+" كود من المنشور المشترك",Toast.LENGTH_LONG).show();
+        } else {
+            if(codeInput!=null) codeInput.setText(shared);
+            Toast.makeText(this,"لم يظهر كود بصيغة NG- في النص المشترك. راجع النص أو انسخ الكود يدويًا.",Toast.LENGTH_LONG).show();
+        }
+    }
+
+    LinkedHashSet<String> extractInviteCodes(String raw) {
+        LinkedHashSet<String> found=new LinkedHashSet<>();
+        Matcher m=invitePattern.matcher(raw==null?"":raw);
+        while(m.find()) found.add(m.group().toUpperCase(Locale.ROOT));
+        return found;
+    }
+
+    void addCodes(String raw) {
+        LinkedHashSet<String> found=extractInviteCodes(raw);
+        if(found.isEmpty() && raw!=null) {
+            for(String line:raw.split("[\\r\\n]+")) {
+                String candidate=line.trim().replaceAll("^[,;]+|[,;]+$","");
+                if(candidate.matches("(?i)[A-Z0-9_-]{6,}")) found.add(candidate);
+            }
+        }
+        addFoundCodes(found);
+    }
+
+    void addFoundCodes(Collection<String> found) {
+        int added=0;
+        for(String c:found) if(unique.add(c)) { codes.add(c); added++; }
+        save();
+        updateCounts();
+        Toast.makeText(this,"تمت إضافة "+added+" كود جديد بعد إزالة المكرر",Toast.LENGTH_LONG).show();
+    }
+
     void copyNext() {
         for(String c:codes) {
-            String key="state_"+c;
-            if(!getPreferences(0).contains(key)) { copy(c); Toast.makeText(this,"تم نسخ الكود. انتقل إلى نسك وأدخله يدويًا",Toast.LENGTH_LONG).show(); return; }
+            if(!getPreferences(0).getBoolean("done_"+c,false)) {
+                currentCode=c;
+                copy(c);
+                Toast.makeText(this,"تم نسخ "+c+" — انتقل إلى نسك وأدخله يدويًا",Toast.LENGTH_LONG).show();
+                return;
+            }
         }
         Toast.makeText(this,"لا توجد أكواد معلّقة",Toast.LENGTH_SHORT).show();
     }
+
     void mark(boolean good) {
-        String current="";
-        ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-        if(cm!=null && cm.hasPrimaryClip()) try { current=cm.getPrimaryClip().getItemAt(0).coerceToText(this).toString(); } catch(Exception e){}
-        if(current.isEmpty() || !unique.contains(current)){ Toast.makeText(this,"انسخ الكود من زر «نسخ الكود التالي» أولًا",Toast.LENGTH_LONG).show(); return; }
-        getPreferences(0).edit().putBoolean("state_"+current,true).apply();
-        if(good)accepted++;else rejected++; if(pending>0)pending--;
-        save(); updateCounts();
+        if(currentCode.isEmpty() || getPreferences(0).getBoolean("done_"+currentCode,false)) {
+            Toast.makeText(this,"اضغط «نسخ الكود التالي» أولًا",Toast.LENGTH_LONG).show();
+            return;
+        }
+        getPreferences(0).edit().putBoolean("done_"+currentCode,true).apply();
+        if(good) accepted++; else rejected++;
+        if(pending>0) pending--;
+        save();
+        updateCounts();
+        Toast.makeText(this,"تم تسجيل نتيجة "+currentCode,Toast.LENGTH_SHORT).show();
+        currentCode="";
     }
-    void copy(String s) { ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Nusuk codes",s)); }
+
+    void copy(String s) {
+        ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE))
+            .setPrimaryClip(ClipData.newPlainText("Nusuk codes",s));
+    }
+
     void updateCounts() {
-        if(countText!=null)countText.setText("إجمالي الأكواد: "+codes.size()+"   |   معلّقة: "+pending+"   |   مقبولة: "+accepted+"   |   مرفوضة: "+rejected);
-        if(listText!=null){StringBuilder s=new StringBuilder("قائمة الأكواد (آخر 100):\n");int start=Math.max(0,codes.size()-100);for(int i=start;i<codes.size();i++)s.append(i+1).append(". ").append(codes.get(i)).append("\n");listText.setText(s.toString());}
+        if(countText!=null)
+            countText.setText("إجمالي الأكواد: "+codes.size()+"   |   معلّقة: "+pending+"   |   مقبولة: "+accepted+"   |   مرفوضة: "+rejected);
+        if(listText!=null) {
+            StringBuilder s=new StringBuilder("قائمة الأكواد (آخر 100):\\n");
+            int start=Math.max(0,codes.size()-100);
+            for(int i=start;i<codes.size();i++) s.append(i+1).append(". ").append(codes.get(i)).append("\\n");
+            listText.setText(s.toString());
+        }
     }
-    void save(){StringBuilder s=new StringBuilder();for(String c:codes)s.append(c).append("\n");getPreferences(0).edit().putString(DATA,s.toString()).putInt(ACCEPT,accepted).putInt(REJECT,rejected).apply();pending=codes.size()-accepted-rejected;}
-    void load(){String raw=getPreferences(0).getString(DATA,"");for(String c:raw.split("\\n"))if(!c.trim().isEmpty()&&unique.add(c.trim()))codes.add(c.trim());accepted=getPreferences(0).getInt(ACCEPT,0);rejected=getPreferences(0).getInt(REJECT,0);pending=Math.max(0,codes.size()-accepted-rejected);}
-    void markStatus(String c, boolean good) { }
+
+    void save() {
+        StringBuilder s=new StringBuilder();
+        for(String c:codes) s.append(c).append("\\n");
+        pending=Math.max(0,codes.size()-accepted-rejected);
+        getPreferences(0).edit().putString(DATA,s.toString()).putInt(ACCEPT,accepted).putInt(REJECT,rejected).apply();
+    }
+
+    void load() {
+        String raw=getPreferences(0).getString(DATA,"");
+        for(String c:raw.split("\\n")) if(!c.trim().isEmpty() && unique.add(c.trim())) codes.add(c.trim());
+        accepted=getPreferences(0).getInt(ACCEPT,0);
+        rejected=getPreferences(0).getInt(REJECT,0);
+        pending=Math.max(0,codes.size()-accepted-rejected);
+    }
 }

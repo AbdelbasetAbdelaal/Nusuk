@@ -19,7 +19,7 @@ public class MainActivity extends Activity {
     String currentCode = "";
     LinearLayout root;
     final String DATA="codes", ACCEPT="accepted", REJECT="rejected";
-    final Pattern invitePattern = Pattern.compile("(?i)(?<![A-Z0-9])NG\\s*[-_‐‑‒–—−﹣－:]\\s*([A-Z0-9](?:[A-Z0-9_-]{2,}[A-Z0-9])?)");
+    final Pattern invitePattern = Pattern.compile("(?iu)NG[\\s\\p{Z}\\p{Cf}]*[-_\\p{Pd}:：][\\s\\p{Z}\\p{Cf}]*([A-Z0-9][A-Z0-9_-]{2,}[A-Z0-9])");
 
     final String[] sourceLinks = {
         "https://www.facebook.com/share/g/1FaRSgvxMT/",
@@ -188,31 +188,32 @@ public class MainActivity extends Activity {
 
     LinkedHashSet<String> extractInviteCodes(String raw) {
         LinkedHashSet<String> found=new LinkedHashSet<>();
-        if(raw==null || raw.isEmpty()) return found;
+        if(raw==null || raw.trim().isEmpty()) return found;
 
-        // Remove invisible Unicode direction marks commonly present in copied social text.
+        // Normalize full-width Latin letters and dash variants that may appear in copied text.
         String normalized=raw
-            .replace("\u200B","").replace("\u200C","").replace("\u200D","")
-            .replace("\u200E","").replace("\u200F","").replace("\u202A","")
-            .replace("\u202B","").replace("\u202C","").replace("\u202D","")
-            .replace("\u202E","").replace("\u2060","").replace("\uFEFF","");
-        // Normalize different Unicode dash characters to the normal hyphen used by invite codes.
-        normalized=normalized.replace('‐','-').replace('‑','-').replace('‒','-')
-            .replace('–','-').replace('—','-').replace('−','-').replace('﹣','-').replace('－','-');
+            .replace('Ｎ','N').replace('Ｇ','G').replace('ｎ','n').replace('ｇ','g')
+            .replace('‐','-').replace('‑','-').replace('‒','-')
+            .replace('–','-').replace('—','-').replace('−','-')
+            .replace('﹣','-').replace('－','-');
 
         Matcher m=invitePattern.matcher(normalized);
         while(m.find()) {
-            String suffix=m.group(1).replaceAll("[\\s\\u00A0]","");
+            String suffix=m.group(1).replaceAll("[\\s\\p{Z}\\p{Cf}]","");
             if(suffix.length()>=4) found.add("NG-"+suffix);
         }
         return found;
     }
 
     void addCodes(String raw) {
+        if(raw==null || raw.trim().isEmpty()) {
+            Toast.makeText(this,"لا يوجد نص للفحص. انسخ التعليق الذي يحتوي على الكود أو الصقه أولًا.",Toast.LENGTH_LONG).show();
+            return;
+        }
         LinkedHashSet<String> found=extractInviteCodes(raw);
         int added=addFoundCodes(found);
         if(found.isEmpty()) {
-            Toast.makeText(this,"لم أعثر على كود يبدأ بـ NG- في النص. انسخ التعليق الذي يحتوي على الرمز كاملًا.",Toast.LENGTH_LONG).show();
+            Toast.makeText(this,"تم فحص النص ("+raw.length()+" حرفًا) ولم يظهر كود يبدأ بـ NG-. تأكد أن النص المنسوخ يتضمن الرمز كاملًا.",Toast.LENGTH_LONG).show();
         } else {
             Toast.makeText(this,"وجدت "+found.size()+" كود يبدأ بـ NG-، وأُضيف "+added+" كود جديد",Toast.LENGTH_LONG).show();
         }
@@ -230,7 +231,7 @@ public class MainActivity extends Activity {
         try {
             ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
             if(cm==null || !cm.hasPrimaryClip()) {
-                Toast.makeText(this,"الحافظة فارغة. انسخ نص التعليقات من فيسبوك أولًا.",Toast.LENGTH_LONG).show();
+                Toast.makeText(this,"الحافظة فارغة. انسخ نص التعليق من فيسبوك أولًا.",Toast.LENGTH_LONG).show();
                 return;
             }
             ClipData clip=cm.getPrimaryClip();
@@ -239,6 +240,7 @@ public class MainActivity extends Activity {
                 CharSequence item=clip.getItemAt(i).coerceToText(this);
                 if(item!=null) raw.append(item).append("\\n");
             }
+            if(commentsInput!=null) commentsInput.setText(raw.toString());
             addCodes(raw.toString());
         } catch(Exception e) {
             Toast.makeText(this,"تعذر قراءة الحافظة. الصق نص التعليقات في المربع المخصص.",Toast.LENGTH_LONG).show();

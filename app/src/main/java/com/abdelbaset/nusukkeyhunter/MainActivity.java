@@ -11,7 +11,7 @@ import java.util.*;
 import java.util.regex.*;
 
 public class MainActivity extends Activity {
-    EditText codeInput;
+    EditText codeInput, commentsInput;
     TextView countText, listText;
     ArrayList<String> codes = new ArrayList<>();
     LinkedHashSet<String> unique = new LinkedHashSet<>();
@@ -86,10 +86,24 @@ public class MainActivity extends Activity {
             b.setOnClickListener(v -> openUrl(link));
         }
 
-        root.addView(text("طريقة جمع الأكواد",16));
-        root.addView(text("افتح المجموعة وابحث داخلها عن: كود نسك أو رمز دعوة نسك. عند ظهور منشور يحتوي على كود، اضغط مشاركة ثم اختر Nusuk Key Hunter. سيستخرج التطبيق أكواد NG تلقائيًا ويحذف المكرر.",14));
+        root.addView(text("استخراج الأكواد من التعليقات",20));
+        root.addView(text("افتح المنشور في فيسبوك، واضغط مطولًا على نص التعليق وحدد النص، ثم افتح قائمة «المزيد» واختر Nusuk Key Hunter إن ظهر. أو انسخ نص التعليقات والصقه في المربع التالي.",14));
+        commentsInput=new EditText(this);
+        commentsInput.setHint("الصق هنا نص تعليق أو مجموعة تعليقات...");
+        commentsInput.setMinLines(4);
+        commentsInput.setGravity(Gravity.TOP);
+        root.addView(commentsInput);
+        Button scanComments=button("فحص التعليقات واستخراج الأكواد");
+        root.addView(scanComments);
+        scanComments.setOnClickListener(v->{
+            String raw=commentsInput.getText().toString();
+            int before=codes.size();
+            addCodes(raw);
+            commentsInput.setText("");
+            if(codes.size()==before) Toast.makeText(this,"لم يتم العثور على كود دعوة جديد في النص",Toast.LENGTH_LONG).show();
+        });
 
-        root.addView(text("أضف الأكواد يدويًا أو الصقها",18));
+        root.addView(text("أضف الأكواد أو نص المنشور يدويًا",18));
         codeInput=new EditText(this);
         codeInput.setHint("الصق كودًا أو نص منشور يحتوي على كود NG-");
         codeInput.setMinLines(3);
@@ -146,8 +160,17 @@ public class MainActivity extends Activity {
     }
 
     void handleSharedIntent(Intent intent) {
-        if(intent==null || !Intent.ACTION_SEND.equals(intent.getAction())) return;
-        String shared=intent.getStringExtra(Intent.EXTRA_TEXT);
+        if(intent==null) return;
+        String action=intent.getAction();
+        String shared="";
+        if(Intent.ACTION_SEND.equals(action)) {
+            shared=intent.getStringExtra(Intent.EXTRA_TEXT);
+        } else if(Intent.ACTION_PROCESS_TEXT.equals(action)) {
+            CharSequence selected=intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT);
+            if(selected!=null) shared=selected.toString();
+        } else {
+            return;
+        }
         if(shared==null) shared="";
         LinkedHashSet<String> found=extractInviteCodes(shared);
         if(!found.isEmpty()) {

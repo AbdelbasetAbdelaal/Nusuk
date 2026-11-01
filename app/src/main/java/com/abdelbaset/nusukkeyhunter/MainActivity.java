@@ -19,7 +19,7 @@ public class MainActivity extends Activity {
     String currentCode = "";
     LinearLayout root;
     final String DATA="codes", ACCEPT="accepted", REJECT="rejected";
-    final Pattern invitePattern = Pattern.compile("(?i)\\bNG-[A-Z0-9_-]{5,}\\b");
+    final Pattern invitePattern = Pattern.compile("(?i)(?<![A-Z0-9])NG\\\\s*[-_‐‑‒–—−﹣－:]\\\\s*([A-Z0-9](?:[A-Z0-9_-]{2,}[A-Z0-9])?)");
 
     final String[] sourceLinks = {
         "https://www.facebook.com/share/g/1FaRSgvxMT/",
@@ -93,6 +93,10 @@ public class MainActivity extends Activity {
         commentsInput.setMinLines(4);
         commentsInput.setGravity(Gravity.TOP);
         root.addView(commentsInput);
+        Button scanClipboard=button("فحص النص المنسوخ في الحافظة عن أكواد NG");
+        root.addView(scanClipboard);
+        scanClipboard.setOnClickListener(v->scanClipboardForCodes());
+
         Button scanComments=button("فحص التعليقات واستخراج الأكواد");
         root.addView(scanComments);
         scanComments.setOnClickListener(v->{

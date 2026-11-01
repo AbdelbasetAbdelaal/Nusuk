@@ -258,30 +258,98 @@ public class MainActivity extends Activity {
         }
     }
 
+    String statusOf(String code) {
+        String status=getPreferences(0).getString("status_"+code,null);
+        if(status!=null) return status;
+        if(getPreferences(0).getBoolean("done_"+code,false)) return "done_old";
+        return "pending";
+    }
+
+    boolean isPending(String code) {
+        return "pending".equals(statusOf(code));
+    }
+
+    String findNextPending() {
+        for(String c:codes) if(isPending(c)) return c;
+        return "";
+    }
+
+    void setCurrentCode(String code) {
+        currentCode=code==null?"":code;
+        getPreferences(0).edit().putString("current_code",currentCode).apply();
+        updateCounts();
+    }
+
     void copyNext() {
-        for(String c:codes) {
-            if(!getPreferences(0).getBoolean("done_"+c,false)) {
-                currentCode=c;
-                copy(c);
-                Toast.makeText(this,"تم نسخ "+c+" — انتقل إلى نسك وأدخله يدويًا",Toast.LENGTH_LONG).show();
+        if(!currentCode.isEmpty() && isPending(currentCode)) {
+            copy(currentCode);
+            Toast.makeText(this,"الكود الحالي: "+currentCode,Toast.LENGTH_LONG).show();
+            return;
+        }
+        String next=findNextPending();
+        if(next.isEmpty()) {
+            Toast.makeText(this,"لا توجد أكواد معلّقة",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        setCurrentCode(next);
+        copy(next);
+        Toast.makeText(this,"تم نسخ "+next+" — انتقل إلى نسك وأدخله يدويًا",Toast.LENGTH_LONG).show();
+    }
+
+    void copyNextAndOpenNusuk() {
+        if(currentCode.isEmpty() || !isPending(currentCode)) {
+            String next=findNextPending();
+            if(next.isEmpty()) {
+                Toast.makeText(this,"لا توجد أكواد معلّقة",Toast.LENGTH_SHORT).show();
                 return;
             }
+            setCurrentCode(next);
         }
-        Toast.makeText(this,"لا توجد أكواد معلّقة",Toast.LENGTH_SHORT).show();
+        copy(currentCode);
+        Toast.makeText(this,"تم نسخ "+currentCode+" — أدخله في خانة الدعوة داخل نسك",Toast.LENGTH_LONG).show();
+        launchNusukApp();
+    }
+
+    void launchNusukApp() {
+        final String packageName="com.moh.nusukapp";
+        try {
+            PackageManager pm=getPackageManager();
+            Intent launch=pm.getLaunchIntentForPackage(packageName);
+            if(launch!=null) {
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(launch);
+                return;
+            }
+            new AlertDialog.Builder(this)
+                .setTitle("تطبيق نسك غير موجود")
+                .setMessage("لم يتم العثور على تطبيق نسك الرسمي على هذا الهاتف. يمكنك تثبيته أو تحديثه من Google Play.")
+                .setNegativeButton("إغلاق",null)
+                .setPositiveButton("فتح Google Play",(d,w)->openUrl("https://play.google.com/store/apps/details?id=com.moh.nusukapp"))
+                .show();
+        } catch(Exception e) {
+            Toast.makeText(this,"تعذر فتح تطبيق نسك. يمكنك فتحه يدويًا من الهاتف.",Toast.LENGTH_LONG).show();
+        }
     }
 
     void mark(boolean good) {
-        if(currentCode.isEmpty() || getPreferences(0).getBoolean("done_"+currentCode,false)) {
-            Toast.makeText(this,"اضغط «نسخ الكود التالي» أولًا",Toast.LENGTH_LONG).show();
+        if(currentCode.isEmpty() || !isPending(currentCode)) {
+            Toast.makeText(this,"اختر الكود التالي أولًا قبل تسجيل النتيجة",Toast.LENGTH_LONG).show();
             return;
         }
-        getPreferences(0).edit().putBoolean("done_"+currentCode,true).apply();
+        final String completedCode=currentCode;
+        final String newStatus=good?"accepted":"rejected";
+        getPreferences(0).edit()
+            .putString("status_"+completedCode,newStatus)
+            .putBoolean("done_"+completedCode,true)
+            .putInt(ACCEPT,good?accepted+1:accepted)
+            .putInt(REJECT,good?rejected:rejected+1)
+            .remove("current_code")
+            .apply();
         if(good) accepted++; else rejected++;
-        if(pending>0) pending--;
-        save();
-        updateCounts();
-        Toast.makeText(this,"تم تسجيل نتيجة "+currentCode,Toast.LENGTH_SHORT).show();
         currentCode="";
+        updateCounts();
+        String message=good?"تم تسجيل الكود كمقبول":"تم تسجيل الكود كمرفوض / مستخدم";
+        Toast.makeText(this,message+": "+completedCode,Toast.LENGTH_LONG).show();
     }
 
     void copy(String s) {

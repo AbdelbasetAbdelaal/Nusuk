@@ -19,7 +19,7 @@ public class MainActivity extends Activity {
     String currentCode = "";
     LinearLayout root;
     final String DATA="codes", ACCEPT="accepted", REJECT="rejected";
-    final Pattern invitePattern = Pattern.compile("(?i)(?<![A-Z0-9])NG\\\\s*[-_‐‑‒–—−﹣－:]\\\\s*([A-Z0-9](?:[A-Z0-9_-]{2,}[A-Z0-9])?)");
+    final Pattern invitePattern = Pattern.compile("(?i)(?<![A-Z0-9])NG\\s*[-_‐‑‒–—−﹣－:]\\s*([A-Z0-9](?:[A-Z0-9_-]{2,}[A-Z0-9])?)");
 
     final String[] sourceLinks = {
         "https://www.facebook.com/share/g/1FaRSgvxMT/",
@@ -188,28 +188,61 @@ public class MainActivity extends Activity {
 
     LinkedHashSet<String> extractInviteCodes(String raw) {
         LinkedHashSet<String> found=new LinkedHashSet<>();
-        Matcher m=invitePattern.matcher(raw==null?"":raw);
-        while(m.find()) found.add(m.group());
+        if(raw==null || raw.isEmpty()) return found;
+
+        // Remove invisible Unicode direction marks commonly present in copied social text.
+        String normalized=raw
+            .replace("\\u200B","").replace("\\u200C","").replace("\\u200D","")
+            .replace("\\u200E","").replace("\\u200F","").replace("\\u202A","")
+            .replace("\\u202B","").replace("\\u202C","").replace("\\u202D","")
+            .replace("\\u202E","").replace("\\u2060","").replace("\\uFEFF","");
+        // Normalize different Unicode dash characters to the normal hyphen used by invite codes.
+        normalized=normalized.replace('‐','-').replace('‑','-').replace('‒','-')
+            .replace('–','-').replace('—','-').replace('−','-').replace('﹣','-').replace('－','-');
+
+        Matcher m=invitePattern.matcher(normalized);
+        while(m.find()) {
+            String suffix=m.group(1).replaceAll("[\\\\s\\\\u00A0]","");
+            if(suffix.length()>=4) found.add("NG-"+suffix);
+        }
         return found;
     }
 
     void addCodes(String raw) {
         LinkedHashSet<String> found=extractInviteCodes(raw);
-        if(found.isEmpty() && raw!=null) {
-            for(String line:raw.split("[\\r\n]+")) {
-                String candidate=line.trim().replaceAll("^[,;]+|[,;]+$","");
-                if(candidate.matches("(?i)[A-Z0-9_-]{6,}")) found.add(candidate);
-            }
+        int added=addFoundCodes(found);
+        if(found.isEmpty()) {
+            Toast.makeText(this,"لم أعثر على كود يبدأ بـ NG- في النص. انسخ التعليق الذي يحتوي على الرمز كاملًا.",Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this,"وجدت "+found.size()+" كود يبدأ بـ NG-، وأُضيف "+added+" كود جديد",Toast.LENGTH_LONG).show();
         }
-        addFoundCodes(found);
     }
 
-    void addFoundCodes(Collection<String> found) {
+    int addFoundCodes(Collection<String> found) {
         int added=0;
         for(String c:found) if(unique.add(c)) { codes.add(c); added++; }
         save();
         updateCounts();
-        Toast.makeText(this,"تمت إضافة "+added+" كود جديد بعد إزالة المكرر",Toast.LENGTH_LONG).show();
+        return added;
+    }
+
+    void scanClipboardForCodes() {
+        try {
+            ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+            if(cm==null || !cm.hasPrimaryClip()) {
+                Toast.makeText(this,"الحافظة فارغة. انسخ نص التعليقات من فيسبوك أولًا.",Toast.LENGTH_LONG).show();
+                return;
+            }
+            ClipData clip=cm.getPrimaryClip();
+            StringBuilder raw=new StringBuilder();
+            for(int i=0;i<clip.getItemCount();i++) {
+                CharSequence item=clip.getItemAt(i).coerceToText(this);
+                if(item!=null) raw.append(item).append("\\n");
+            }
+            addCodes(raw.toString());
+        } catch(Exception e) {
+            Toast.makeText(this,"تعذر قراءة الحافظة. الصق نص التعليقات في المربع المخصص.",Toast.LENGTH_LONG).show();
+        }
     }
 
     void copyNext() {

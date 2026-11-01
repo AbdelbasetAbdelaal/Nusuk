@@ -14,6 +14,8 @@ import java.util.regex.*;
 public class MainActivity extends Activity {
     EditText codeInput, commentsInput;
     TextView countText, listText, currentCodeText;
+    Button toggleListButton;
+    boolean listExpanded=false;
     ArrayList<String> codes = new ArrayList<>();
     LinkedHashSet<String> unique = new LinkedHashSet<>();
     int accepted=0, rejected=0, pending=0;
@@ -114,7 +116,8 @@ public class MainActivity extends Activity {
         root.addView(text("افتح المنشور في فيسبوك، واضغط مطولًا على نص التعليق وحدد النص، ثم افتح قائمة «المزيد» واختر Nusuk Key Hunter إن ظهر. أو انسخ نص التعليقات والصقه في المربع التالي.",14));
         commentsInput=new EditText(this);
         commentsInput.setHint("الصق هنا نص تعليق أو مجموعة تعليقات...");
-        commentsInput.setMinLines(4);
+        commentsInput.setMinLines(2);
+        commentsInput.setMaxLines(4);
         commentsInput.setGravity(Gravity.TOP);
         root.addView(commentsInput);
         Button scanClipboard=button("فحص النص المنسوخ في الحافظة عن أكواد NG");
@@ -125,16 +128,15 @@ public class MainActivity extends Activity {
         root.addView(scanComments);
         scanComments.setOnClickListener(v->{
             String raw=commentsInput.getText().toString();
-            int before=codes.size();
             addCodes(raw);
             commentsInput.setText("");
-            if(codes.size()==before) Toast.makeText(this,"لم يتم العثور على كود دعوة جديد في النص",Toast.LENGTH_LONG).show();
         });
 
         root.addView(text("أضف الأكواد أو نص المنشور يدويًا",18));
         codeInput=new EditText(this);
         codeInput.setHint("الصق كودًا أو نص منشور يحتوي على كود NG-");
-        codeInput.setMinLines(3);
+        codeInput.setMinLines(2);
+        codeInput.setMaxLines(4);
         codeInput.setGravity(Gravity.TOP);
         root.addView(codeInput);
 
@@ -162,7 +164,17 @@ public class MainActivity extends Activity {
                 save(); render();
             }).show());
 
-        listText=text("",14); root.addView(listText); updateCounts();
+        toggleListButton=button("إظهار قائمة الأكواد ("+codes.size()+")");
+        root.addView(toggleListButton);
+        listText=text("",14);
+        listText.setVisibility(View.GONE);
+        root.addView(listText);
+        toggleListButton.setOnClickListener(v->{
+            listExpanded=!listExpanded;
+            listText.setVisibility(listExpanded?View.VISIBLE:View.GONE);
+            toggleListButton.setText((listExpanded?"إخفاء":"إظهار")+" قائمة الأكواد ("+codes.size()+")");
+        });
+        updateCounts();
     }
 
     void openUrl(String url) {
@@ -251,8 +263,8 @@ public class MainActivity extends Activity {
                 CharSequence item=clip.getItemAt(i).coerceToText(this);
                 if(item!=null) raw.append(item).append("\n");
             }
-            if(commentsInput!=null) commentsInput.setText(raw.toString());
             addCodes(raw.toString());
+            if(commentsInput!=null) commentsInput.setText("");
         } catch(Exception e) {
             Toast.makeText(this,"تعذر قراءة الحافظة. الصق نص التعليقات في المربع المخصص.",Toast.LENGTH_LONG).show();
         }
@@ -376,6 +388,10 @@ public class MainActivity extends Activity {
                 s.append(i+1).append(". ").append(code).append(" — ").append(label).append("\n");
             }
             listText.setText(s.toString());
+            listText.setVisibility(listExpanded?View.VISIBLE:View.GONE);
+        }
+        if(toggleListButton!=null) {
+            toggleListButton.setText((listExpanded?"إخفاء":"إظهار")+" قائمة الأكواد ("+codes.size()+")");
         }
     }
 

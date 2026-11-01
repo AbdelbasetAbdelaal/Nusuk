@@ -6,7 +6,6 @@ import android.content.*;
 import android.graphics.Typeface;
 import android.view.*;
 import android.widget.*;
-import android.text.*;
 import java.util.*;
 
 public class MainActivity extends Activity {

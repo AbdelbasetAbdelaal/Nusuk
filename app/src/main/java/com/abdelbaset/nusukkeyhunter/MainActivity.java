@@ -192,17 +192,17 @@ public class MainActivity extends Activity {
 
         // Remove invisible Unicode direction marks commonly present in copied social text.
         String normalized=raw
-            .replace("\\u200B","").replace("\\u200C","").replace("\\u200D","")
-            .replace("\\u200E","").replace("\\u200F","").replace("\\u202A","")
-            .replace("\\u202B","").replace("\\u202C","").replace("\\u202D","")
-            .replace("\\u202E","").replace("\\u2060","").replace("\\uFEFF","");
+            .replace("\u200B","").replace("\u200C","").replace("\u200D","")
+            .replace("\u200E","").replace("\u200F","").replace("\u202A","")
+            .replace("\u202B","").replace("\u202C","").replace("\u202D","")
+            .replace("\u202E","").replace("\u2060","").replace("\uFEFF","");
         // Normalize different Unicode dash characters to the normal hyphen used by invite codes.
         normalized=normalized.replace('‐','-').replace('‑','-').replace('‒','-')
             .replace('–','-').replace('—','-').replace('−','-').replace('﹣','-').replace('－','-');
 
         Matcher m=invitePattern.matcher(normalized);
         while(m.find()) {
-            String suffix=m.group(1).replaceAll("[\\\\s\\\\u00A0]","");
+            String suffix=m.group(1).replaceAll("[\\s\\u00A0]","");
             if(suffix.length()>=4) found.add("NG-"+suffix);
         }
         return found;

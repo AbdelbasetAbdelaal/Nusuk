@@ -7,12 +7,13 @@ import android.net.Uri;
 import android.graphics.Typeface;
 import android.view.*;
 import android.widget.*;
+import android.content.pm.PackageManager;
 import java.util.*;
 import java.util.regex.*;
 
 public class MainActivity extends Activity {
     EditText codeInput, commentsInput;
-    TextView countText, listText;
+    TextView countText, listText, currentCodeText;
     ArrayList<String> codes = new ArrayList<>();
     LinkedHashSet<String> unique = new LinkedHashSet<>();
     int accepted=0, rejected=0, pending=0;
@@ -72,6 +73,29 @@ public class MainActivity extends Activity {
 
         countText=text("",16); root.addView(countText); updateCounts();
 
+        root.addView(text("مساعد نسك — تجربة الأكواد بالترتيب",20));
+        currentCodeText=text("",18);
+        currentCodeText.setTypeface(null,Typeface.BOLD);
+        root.addView(currentCodeText);
+        Button copyOpen=button("نسخ الكود التالي وفتح تطبيق نسك");
+        root.addView(copyOpen);
+        copyOpen.setOnClickListener(v->copyNextAndOpenNusuk());
+        Button next=button("نسخ الكود التالي فقط");
+        root.addView(next);
+        next.setOnClickListener(v->copyNext());
+        Button openNusuk=button("فتح تطبيق نسك");
+        root.addView(openNusuk);
+        openNusuk.setOnClickListener(v->launchNusukApp());
+
+        root.addView(text("بعد تجربة الكود في نسك، سجّل النتيجة:",16));
+        LinearLayout resultRow=new LinearLayout(this); root.addView(resultRow);
+        Button ok=button("تم قبوله");
+        resultRow.addView(ok,new LinearLayout.LayoutParams(0,-2,1));
+        Button bad=button("مرفوض / مستخدم");
+        resultRow.addView(bad,new LinearLayout.LayoutParams(0,-2,1));
+        ok.setOnClickListener(v->mark(true));
+        bad.setOnClickListener(v->mark(false));
+
         root.addView(text("البحث عن الأكواد في فيسبوك",20));
         Button search=button("فتح بحث فيسبوك عن أكواد نسك");
         root.addView(search);
@@ -118,20 +142,7 @@ public class MainActivity extends Activity {
         root.addView(add);
         add.setOnClickListener(v->{ addCodes(codeInput.getText().toString()); codeInput.setText(""); });
 
-        Button next=button("نسخ الكود التالي");
-        root.addView(next);
-        next.setOnClickListener(v->copyNext());
 
-        Button openNusuk=button("فتح موقع نسك");
-        root.addView(openNusuk);
-        openNusuk.setOnClickListener(v->openUrl("https://services.nusuk.sa/"));
-
-        root.addView(text("سجّل نتيجة الكود المحدد",18));
-        LinearLayout row=new LinearLayout(this); root.addView(row);
-        Button ok=button("تم قبوله"); row.addView(ok,new LinearLayout.LayoutParams(0,-2,1));
-        Button bad=button("مرفوض / مستخدم"); row.addView(bad,new LinearLayout.LayoutParams(0,-2,1));
-        ok.setOnClickListener(v->mark(true));
-        bad.setOnClickListener(v->mark(false));
 
         Button export=button("نسخ جميع الأكواد"); root.addView(export);
         export.setOnClickListener(v->{

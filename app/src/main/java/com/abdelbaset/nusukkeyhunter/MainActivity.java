@@ -162,7 +162,7 @@ public class MainActivity extends Activity {
     LinkedHashSet<String> extractInviteCodes(String raw) {
         LinkedHashSet<String> found=new LinkedHashSet<>();
         Matcher m=invitePattern.matcher(raw==null?"":raw);
-        while(m.find()) found.add(m.group().toUpperCase(Locale.ROOT));
+        while(m.find()) found.add(m.group());
         return found;
     }
 

@@ -118,7 +118,7 @@ public class MainActivity extends Activity {
         Button export=button("نسخ جميع الأكواد"); root.addView(export);
         export.setOnClickListener(v->{
             StringBuilder s=new StringBuilder();
-            for(String c:codes) s.append(c).append("\\n");
+            for(String c:codes) s.append(c).append("\n");
             copy(s.toString());
             Toast.makeText(this,"تم نسخ قائمة الأكواد",Toast.LENGTH_SHORT).show();
         });
@@ -169,7 +169,7 @@ public class MainActivity extends Activity {
     void addCodes(String raw) {
         LinkedHashSet<String> found=extractInviteCodes(raw);
         if(found.isEmpty() && raw!=null) {
-            for(String line:raw.split("[\\r\\n]+")) {
+            for(String line:raw.split("[\\r\n]+")) {
                 String candidate=line.trim().replaceAll("^[,;]+|[,;]+$","");
                 if(candidate.matches("(?i)[A-Z0-9_-]{6,}")) found.add(candidate);
             }
@@ -220,23 +220,23 @@ public class MainActivity extends Activity {
         if(countText!=null)
             countText.setText("إجمالي الأكواد: "+codes.size()+"   |   معلّقة: "+pending+"   |   مقبولة: "+accepted+"   |   مرفوضة: "+rejected);
         if(listText!=null) {
-            StringBuilder s=new StringBuilder("قائمة الأكواد (آخر 100):\\n");
+            StringBuilder s=new StringBuilder("قائمة الأكواد (آخر 100):\n");
             int start=Math.max(0,codes.size()-100);
-            for(int i=start;i<codes.size();i++) s.append(i+1).append(". ").append(codes.get(i)).append("\\n");
+            for(int i=start;i<codes.size();i++) s.append(i+1).append(". ").append(codes.get(i)).append("\n");
             listText.setText(s.toString());
         }
     }
 
     void save() {
         StringBuilder s=new StringBuilder();
-        for(String c:codes) s.append(c).append("\\n");
+        for(String c:codes) s.append(c).append("\n");
         pending=Math.max(0,codes.size()-accepted-rejected);
         getPreferences(0).edit().putString(DATA,s.toString()).putInt(ACCEPT,accepted).putInt(REJECT,rejected).apply();
     }
 
     void load() {
         String raw=getPreferences(0).getString(DATA,"");
-        for(String c:raw.split("\\n")) if(!c.trim().isEmpty() && unique.add(c.trim())) codes.add(c.trim());
+        for(String c:raw.split("\n")) if(!c.trim().isEmpty() && unique.add(c.trim())) codes.add(c.trim());
         accepted=getPreferences(0).getInt(ACCEPT,0);
         rejected=getPreferences(0).getInt(REJECT,0);
         pending=Math.max(0,codes.size()-accepted-rejected);

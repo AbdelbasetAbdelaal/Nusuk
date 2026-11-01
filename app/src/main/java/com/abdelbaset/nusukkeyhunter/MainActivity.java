@@ -358,28 +358,43 @@ public class MainActivity extends Activity {
     }
 
     void updateCounts() {
+        pending=0;
+        for(String code:codes) if(isPending(code)) pending++;
         if(countText!=null)
             countText.setText("إجمالي الأكواد: "+codes.size()+"   |   معلّقة: "+pending+"   |   مقبولة: "+accepted+"   |   مرفوضة: "+rejected);
+        if(currentCodeText!=null) {
+            if(currentCode.isEmpty()) currentCodeText.setText("الكود الحالي: لم يتم اختيار كود بعد");
+            else currentCodeText.setText("الكود الجاري تجربته: "+currentCode+"\\nانسخه وأدخله في تطبيق نسك، ثم سجّل النتيجة هنا");
+        }
         if(listText!=null) {
-            StringBuilder s=new StringBuilder("قائمة الأكواد (آخر 100):\n");
-            int start=Math.max(0,codes.size()-100);
-            for(int i=start;i<codes.size();i++) s.append(i+1).append(". ").append(codes.get(i)).append("\n");
+            StringBuilder s=new StringBuilder("قائمة الأكواد (آخر 100):\\n");
+            int first=Math.max(0,codes.size()-100);
+            for(int i=first;i<codes.size();i++) {
+                String code=codes.get(i);
+                String status=statusOf(code);
+                String label="pending".equals(status)?"معلّق":("accepted".equals(status)?"مقبول":("rejected".equals(status)?"مرفوض / مستخدم":"معالج سابقًا"));
+                s.append(i+1).append(". ").append(code).append(" — ").append(label).append("\\n");
+            }
             listText.setText(s.toString());
         }
     }
 
     void save() {
         StringBuilder s=new StringBuilder();
-        for(String c:codes) s.append(c).append("\n");
-        pending=Math.max(0,codes.size()-accepted-rejected);
+        for(String c:codes) s.append(c).append("\\n");
+        pending=0;
+        for(String code:codes) if(isPending(code)) pending++;
         getPreferences(0).edit().putString(DATA,s.toString()).putInt(ACCEPT,accepted).putInt(REJECT,rejected).apply();
     }
 
     void load() {
         String raw=getPreferences(0).getString(DATA,"");
-        for(String c:raw.split("\n")) if(!c.trim().isEmpty() && unique.add(c.trim())) codes.add(c.trim());
+        for(String c:raw.split("\\n")) if(!c.trim().isEmpty() && unique.add(c.trim())) codes.add(c.trim());
         accepted=getPreferences(0).getInt(ACCEPT,0);
         rejected=getPreferences(0).getInt(REJECT,0);
-        pending=Math.max(0,codes.size()-accepted-rejected);
+        currentCode=getPreferences(0).getString("current_code","");
+        if(!currentCode.isEmpty() && !isPending(currentCode)) currentCode="";
+        pending=0;
+        for(String code:codes) if(isPending(code)) pending++;
     }
 }

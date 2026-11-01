@@ -375,7 +375,7 @@ public class MainActivity extends Activity {
         if(countText!=null)
             countText.setText("إجمالي الأكواد: "+codes.size()+"   |   معلّقة: "+pending+"   |   مقبولة: "+accepted+"   |   مرفوضة: "+rejected);
         if(currentCodeText!=null) {
-            if(currentCode.isEmpty()) currentCodeText.setText("الكود الحالي: لم يتم اختيار كود بعد");
+            if(currentCode.isEmpty()) currentCodeText.setText("لا يوجد كود قيد التجربة حاليًا");
             else currentCodeText.setText("الكود الجاري تجربته: "+currentCode+"\nانسخه وأدخله في تطبيق نسك، ثم سجّل النتيجة هنا");
         }
         if(listText!=null) {

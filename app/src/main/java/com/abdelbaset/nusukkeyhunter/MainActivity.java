@@ -238,7 +238,7 @@ public class MainActivity extends Activity {
             StringBuilder raw=new StringBuilder();
             for(int i=0;i<clip.getItemCount();i++) {
                 CharSequence item=clip.getItemAt(i).coerceToText(this);
-                if(item!=null) raw.append(item).append("\\n");
+                if(item!=null) raw.append(item).append("\n");
             }
             if(commentsInput!=null) commentsInput.setText(raw.toString());
             addCodes(raw.toString());

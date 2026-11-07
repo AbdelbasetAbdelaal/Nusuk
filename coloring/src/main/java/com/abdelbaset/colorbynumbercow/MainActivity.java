@@ -14,6 +14,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -81,7 +82,13 @@ public class MainActivity extends Activity {
             scaledBoard.getPixels(basePixels, 0, mapWidth, 0, 0, mapWidth, mapHeight);
             map.getPixels(mapPixels, 0, mapWidth, 0, 0, mapWidth, mapHeight);
             regionIds = new int[mapPixels.length];
-            for (int i = 0; i < mapPixels.length; i++) regionIds[i] = Color.red(mapPixels[i]);
+            for (int i = 0; i < mapPixels.length; i++) {
+                regionIds[i] = Color.red(mapPixels[i]);
+                int px = basePixels[i];
+                int luminance = (Color.red(px) * 299 + Color.green(px) * 587 + Color.blue(px) * 114) / 1000;
+                // Remove the grey paper cast and strengthen the printed digits and outlines.
+                basePixels[i] = luminance >= 176 ? Color.WHITE : Color.BLACK;
+            }
             if (board != scaledBoard) board.recycle();
             map.recycle();
             return true;
@@ -99,6 +106,8 @@ public class MainActivity extends Activity {
             if (f.length() >= i) filled[i] = f.charAt(i - 1) == '1';
         }
         playMode = countAssigned() == REGION_COUNT;
+        activeColor = preferences.getInt("activeColor", 0);
+        if (activeColor < 0 || activeColor > 8) activeColor = 0;
     }
 
     private void saveProgress() {
@@ -109,7 +118,8 @@ public class MainActivity extends Activity {
             f.append(filled[i] ? '1' : '0');
         }
         preferences.edit().putString("assignments", a.toString())
-            .putString("filled", f.toString()).apply();
+            .putString("filled", f.toString())
+            .putInt("activeColor", activeColor).commit();
     }
 
     private int countAssigned() {
@@ -197,6 +207,23 @@ public class MainActivity extends Activity {
         boardView.setBackground(rounded(Color.WHITE, 0xFFE4DED2, 1));
         root.addView(boardView, boardParams);
 
+        LinearLayout zoomRow = new LinearLayout(this);
+        zoomRow.setGravity(Gravity.CENTER);
+        Button zoomOut = makeButton("−", 0xFFE5ECE8, 0xFF244C40);
+        Button zoomReset = makeButton("ملاءمة الصورة", 0xFFE5ECE8, 0xFF244C40);
+        Button zoomIn = makeButton("+", 0xFFE5ECE8, 0xFF244C40);
+        LinearLayout.LayoutParams zoomSmall = new LinearLayout.LayoutParams(dp(58), dp(40));
+        LinearLayout.LayoutParams zoomWide = new LinearLayout.LayoutParams(0, dp(40), 1);
+        zoomSmall.setMargins(dp(4), 0, dp(4), dp(4));
+        zoomWide.setMargins(dp(4), 0, dp(4), dp(4));
+        zoomRow.addView(zoomOut, zoomSmall);
+        zoomRow.addView(zoomReset, zoomWide);
+        zoomRow.addView(zoomIn, zoomSmall);
+        root.addView(zoomRow);
+        zoomOut.setOnClickListener(v -> boardView.zoomBy(0.8f));
+        zoomIn.setOnClickListener(v -> boardView.zoomBy(1.25f));
+        zoomReset.setOnClickListener(v -> boardView.resetZoom());
+
         root.addView(makeText("اختر رقم اللون", 14, true));
         for (int row = 0; row < 2; row++) {
             LinearLayout paletteRow = new LinearLayout(this);
@@ -230,11 +257,7 @@ public class MainActivity extends Activity {
 
     private void chooseColor(int number) {
         activeColor = number;
-        if (!playMode) {
-            if (selectedRegion == 0) {
-                toast("المس مساحة في الرسم أولًا، ثم اختر رقمها.");
-                return;
-            }
+        if (!playMode && selectedRegion > 0) {
             assigned[selectedRegion] = number;
             filled[selectedRegion] = false;
             int chosen = selectedRegion;
@@ -242,10 +265,15 @@ public class MainActivity extends Activity {
             saveProgress();
             renderBoard();
             refreshUi();
-            toast("تم حفظ المساحة " + chosen + " بالرقم " + number + ". حدّد المساحة التالية.");
+            toast("تم تسجيل المساحة " + chosen + " بالرقم " + number + ". اختر الرقم نفسه لمساحات أخرى.");
         } else {
+            saveProgress();
             refreshUi();
-            toast("اخترت اللون رقم " + number + " — " + COLOR_NAMES[number - 1]);
+            if (playMode) {
+                toast("اللون المختار: " + number + " — " + COLOR_NAMES[number - 1] + ". المس المساحات المطابقة.");
+            } else {
+                toast("تم اختيار الرقم " + number + ". المس الآن المساحات التي تحمل هذا الرقم.");
+            }
         }
     }
 
@@ -265,6 +293,7 @@ public class MainActivity extends Activity {
             selectedRegion = 0;
             toast("وضع إعداد الورقة: المساحة ثم رقمها المطبوع.");
         }
+        saveProgress();
         refreshUi();
         renderBoard();
     }
@@ -276,10 +305,20 @@ public class MainActivity extends Activity {
             return;
         }
         if (!playMode) {
-            selectedRegion = id;
-            refreshUi();
-            renderBoard();
-            toast("المساحة " + id + " محددة. اختر رقمها المطبوع من الأسفل.");
+            if (activeColor > 0) {
+                assigned[id] = activeColor;
+                filled[id] = false;
+                selectedRegion = 0;
+                saveProgress();
+                renderBoard();
+                refreshUi();
+                toast("تم تسجيل المساحة بالرقم " + activeColor + ". يمكنك متابعة المساحات التي تحمل الرقم نفسه.");
+            } else {
+                selectedRegion = id;
+                refreshUi();
+                renderBoard();
+                toast("المساحة " + id + " محددة. اختر رقمها، أو اختر الرقم أولًا ثم المس المساحة.");
+            }
             return;
         }
         if (assigned[id] == 0) {
@@ -327,10 +366,11 @@ public class MainActivity extends Activity {
             int base = basePixels[i];
             int id = regionIds[i];
             int color = base;
-            if (id > 0 && id <= REGION_COUNT && filled[id] && assigned[id] > 0)
-                color = blend(base, PALETTE[assigned[id] - 1], 0.64f);
-            if (!playMode && selectedRegion > 0 && id == selectedRegion)
-                color = blend(color, 0xFFFFD34E, 0.48f);
+            if (id > 0 && id <= REGION_COUNT && filled[id] && assigned[id] > 0) {
+                // Full-strength colour on white paper; preserve all black digits and outlines.
+                if (Color.red(base) > 160) color = PALETTE[assigned[id] - 1];
+            }
+            // The selection is shown in the palette, not as a yellow tint on the drawing.
             out[i] = color;
         }
         if (renderedBitmap != null && !renderedBitmap.isRecycled()) renderedBitmap.recycle();
@@ -352,16 +392,25 @@ public class MainActivity extends Activity {
             modeButton.setText("إعداد الورقة");
             progressText.setText(String.format(Locale.getDefault(), "التلوين: %d من %d", countFilled(), REGION_COUNT));
         } else {
-            statusText.setText(selectedRegion > 0
-                ? "المساحة " + selectedRegion + " محددة — اختر الرقم المطبوع داخلها."
-                : "إعداد أول مرة: المس كل مساحة، ثم اختر رقمها المطبوع.");
+            if (selectedRegion > 0) {
+                statusText.setText("المساحة " + selectedRegion + " محددة — اختر رقمها، أو اختر الرقم أولًا ثم المس المساحة.");
+            } else if (activeColor > 0) {
+                statusText.setText("الرقم المختار: " + activeColor + " — المس كل المساحات التي تحمل هذا الرقم لتسجيلها.");
+            } else {
+                statusText.setText("إعداد أول مرة: اختر رقمًا ثم المس المساحات المطابقة، أو المس المساحة أولًا.");
+            }
             modeButton.setText("ابدأ اللعب");
             progressText.setText(String.format(Locale.getDefault(), "تم إعداد %d من %d مساحة", countAssigned(), REGION_COUNT));
         }
         for (int i = 0; i < 8; i++) {
             Button b = colorButtons[i];
-            if (b != null) b.setBackground(rounded(PALETTE[i],
-                activeColor == i + 1 ? 0xFF202B36 : 0xFFB4B8B3, activeColor == i + 1 ? 3 : 1));
+            if (b != null) {
+                b.setText(activeColor == i + 1 ? "✓ " + (i + 1) : String.valueOf(i + 1));
+                b.setBackground(rounded(PALETTE[i],
+                    activeColor == i + 1 ? 0xFF101820 : 0xFFB4B8B3,
+                    activeColor == i + 1 ? 5 : 1));
+                b.setElevation(activeColor == i + 1 ? dp(5) : dp(1));
+            }
         }
     }
 
@@ -399,15 +448,72 @@ public class MainActivity extends Activity {
     private class BoardView extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         private final RectF imageRect = new RectF();
-        BoardView() { super(MainActivity.this); }
+        private final ScaleGestureDetector scaleDetector;
+        private float zoom = 1f;
+        private float offsetX = 0f, offsetY = 0f;
+        private float lastX, lastY, downX, downY;
+        private boolean dragging = false;
 
-        RectF getImageRect() {
+        BoardView() {
+            super(MainActivity.this);
+            scaleDetector = new ScaleGestureDetector(MainActivity.this,
+                new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    @Override public boolean onScale(ScaleGestureDetector detector) {
+                        float oldZoom = zoom;
+                        zoom = Math.max(1f, Math.min(4f, zoom * detector.getScaleFactor()));
+                        float cx = getWidth() / 2f, cy = getHeight() / 2f;
+                        float fx = detector.getFocusX() - cx;
+                        float fy = detector.getFocusY() - cy;
+                        offsetX = (offsetX - fx) * (zoom / oldZoom) + fx;
+                        offsetY = (offsetY - fy) * (zoom / oldZoom) + fy;
+                        clampOffsets();
+                        invalidate();
+                        return true;
+                    }
+                });
+        }
+
+        void zoomBy(float factor) {
+            float oldZoom = zoom;
+            zoom = Math.max(1f, Math.min(4f, zoom * factor));
+            float ratio = zoom / oldZoom;
+            offsetX *= ratio;
+            offsetY *= ratio;
+            clampOffsets();
+            invalidate();
+        }
+
+        void resetZoom() {
+            zoom = 1f;
+            offsetX = 0f;
+            offsetY = 0f;
+            invalidate();
+        }
+
+        private RectF baseRect() {
             float w = getWidth() - dp(10);
             float h = getHeight() - dp(10);
-            float scale = Math.min(w / mapWidth, h / mapHeight);
-            float dw = mapWidth * scale, dh = mapHeight * scale;
+            float factor = Math.min(w / mapWidth, h / mapHeight);
+            float dw = mapWidth * factor, dh = mapHeight * factor;
             float left = (getWidth() - dw) / 2f, top = (getHeight() - dh) / 2f;
-            imageRect.set(left, top, left + dw, top + dh);
+            return new RectF(left, top, left + dw, top + dh);
+        }
+
+        private void clampOffsets() {
+            RectF base = baseRect();
+            float maxX = Math.max(0f, (base.width() * zoom - getWidth()) / 2f);
+            float maxY = Math.max(0f, (base.height() * zoom - getHeight()) / 2f);
+            offsetX = Math.max(-maxX, Math.min(maxX, offsetX));
+            offsetY = Math.max(-maxY, Math.min(maxY, offsetY));
+            if (zoom <= 1f) { offsetX = 0f; offsetY = 0f; }
+        }
+
+        RectF getImageRect() {
+            RectF base = baseRect();
+            float cx = getWidth() / 2f + offsetX;
+            float cy = getHeight() / 2f + offsetY;
+            float dw = base.width() * zoom, dh = base.height() * zoom;
+            imageRect.set(cx - dw / 2f, cy - dh / 2f, cx + dw / 2f, cy + dh / 2f);
             return imageRect;
         }
 
@@ -418,11 +524,46 @@ public class MainActivity extends Activity {
         }
 
         @Override public boolean onTouchEvent(MotionEvent event) {
-            if (event.getAction() == MotionEvent.ACTION_UP) {
-                performClick();
-                onBoardTap(event.getX(), event.getY());
+            scaleDetector.onTouchEvent(event);
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downX = lastX = event.getX();
+                    downY = lastY = event.getY();
+                    dragging = false;
+                    return true;
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    dragging = true;
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    if (zoom > 1.02f && event.getPointerCount() == 1 && !scaleDetector.isInProgress()) {
+                        float dx = event.getX() - lastX;
+                        float dy = event.getY() - lastY;
+                        if (Math.abs(event.getX() - downX) + Math.abs(event.getY() - downY) > dp(7)) dragging = true;
+                        if (dragging) {
+                            getParent().requestDisallowInterceptTouchEvent(true);
+                            offsetX += dx;
+                            offsetY += dy;
+                            clampOffsets();
+                            invalidate();
+                        }
+                    }
+                    lastX = event.getX();
+                    lastY = event.getY();
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                    if (!dragging && event.getPointerCount() == 1) {
+                        performClick();
+                        onBoardTap(event.getX(), event.getY());
+                    }
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                    return true;
+                default:
+                    return true;
             }
-            return true;
         }
 
         @Override public boolean performClick() {

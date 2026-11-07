@@ -1,0 +1,39 @@
+name: Build Color By Number Cow APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'coloring/**'
+      - 'settings.gradle'
+      - '.github/workflows/build-color-by-number-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-coloring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build coloring APK
+        run: gradle :coloring:assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Color-By-Number-Cow-APK
+          path: coloring/build/outputs/apk/debug/coloring-debug.apk
+          if-no-files-found: error
+          retention-days: 30

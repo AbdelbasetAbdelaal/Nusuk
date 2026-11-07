@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-coloring:
@@ -31,9 +31,21 @@ jobs:
           gradle-version: '8.9'
       - name: Build coloring APK
         run: gradle :coloring:assembleDebug
+      - name: Prepare named APK
+        run: cp coloring/build/outputs/apk/debug/coloring-debug.apk Color-By-Number-Cow-v1.1.0.apk
+      - name: Publish direct APK download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: color-by-number-v1.1.0
+          name: Color By Number Cow v1.1.0
+          body: Android APK download for the offline cow color-by-number game.
+          files: Color-By-Number-Cow-v1.1.0.apk
+          draft: false
+          prerelease: false
+          make_latest: false
       - uses: actions/upload-artifact@v4
         with:
           name: Color-By-Number-Cow-APK
-          path: coloring/build/outputs/apk/debug/coloring-debug.apk
+          path: Color-By-Number-Cow-v1.1.0.apk
           if-no-files-found: error
           retention-days: 30
